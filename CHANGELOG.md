@@ -3,6 +3,35 @@
 All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.1.0] - 2026-11-22
+
+### Added
+- **Pixel-count cap enforced before decoding.** `extended_images/max_pixels`
+  (ProjectSettings, default 268 MP — same as Godot's WebP cap) is checked
+  against the dimensions declared in the file header *before* the decoder
+  allocates the output buffer, for all four formats (AVIF, JXL, HEIC, QOI).
+  HEIC now also checks the handle dimensions before `heif_decode_image`,
+  and JXL before the out-buffer event. Files exceeding the cap are rejected
+  with a descriptive error instead of exhausting memory.
+- **File-size cap enforced before decoding.**
+  `extended_images/max_file_size` (default 256 MiB) rejects oversized
+  inputs before they are handed to the decoders. Both caps are set to `0`
+  to disable.
+- **Real error messages.** Failed decodes now print the underlying library
+  message: `avifResultToString()` for AVIF, a readable name for the
+  `JxlDecoderStatus` (including "truncated file" vs "corrupt") for JXL,
+  and `heif_error.message` for HEIC. QOI reports corrupt/truncated input.
+  Errors that used to be silent `nullptr` returns (e.g. basic-info
+  failures) are also reported.
+- CI now builds **both** `template_debug` and `template_release` for Linux
+  and Windows, and the release job attaches the four binaries plus the
+  packaged addon zip.
+
+### Security
+- Mitigates memory-exhaustion vectors through crafted headers (huge
+  declared dimensions) and oversized files, complementing the upstream
+  library updates from v1.0.0.
+
 ## [1.0.0] - 2026-11-22
 
 ### Added

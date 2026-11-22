@@ -18,11 +18,14 @@ FileSystem dock shows thumbnails, just like PNG.
 
 ## Status
 
-v1.0.0 — first public release. The extension compiles and links cleanly on
-Linux x86_64 (verified by a full CMake + Ninja build). Windows and macOS
-builds are produced by CI but have not been smoke-tested locally. See
+v1.1.0 — decode limits (268 MP pixel cap, 256 MiB file cap, both
+configurable via Project Settings) and real library error messages. The
+extension compiles and links cleanly on Linux x86_64 for both
+template_debug and template_release (verified by full CMake + Ninja
+builds). Windows builds are produced by CI. See
 [CHANGELOG.md](CHANGELOG.md) for the full release notes and
-[docs/PLAN_LIMITACIONES_v2.md](docs/PLAN_LIMITACIONES_v2.md) for the roadmap.
+[docs/PLAN_LIMITACIONES_v2.md](docs/PLAN_LIMITACIONES_v2.md) for the
+roadmap.
 
 ## Build (Linux)
 
@@ -87,6 +90,21 @@ for `libheif` and `libde265`. Source for each library is shipped in the
 repository so the binary can be rebuilt and relinked, as required by the
 LGPL.
 
+## Decode limits (v1.1.0)
+
+Two Project Settings guard against crafted or oversized files. Both are
+read once and cached; set them to `0` to disable.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `extended_images/max_pixels` | `268435456` (268 MP) | Maximum `width * height` accepted, checked **before** the decoder allocates its output buffer |
+| `extended_images/max_file_size` | `268435456` (256 MiB) | Maximum input file size handed to a decoder |
+
+When a file exceeds a limit, the load fails and the console shows a message
+naming the actual dimensions/size, the active limit and the setting to
+raise. Files larger than 50 MP are unusual for game assets; if you load
+them intentionally, raise `max_pixels` accordingly.
+
 ## Known limitations
 
 These are documented in detail in
@@ -99,10 +117,10 @@ slated for the next release:
 - **No EXIF / ICC handling.** Orientation tags and color profiles are
   ignored, so portrait photos from a phone may appear sideways.
 - **First frame only** for animated AVIF and animated JXL.
-- **No memory cap.** A valid but extremely large image can exhaust memory
-  during decoding. Do not load untrusted images without additional limits.
-- **Generic error reporting.** A failed decode returns `ERR_PARSE_ERROR`
-  without the underlying library's message.
+
+Solved in v1.1.0: memory caps before decoding (see above) and error
+reporting (failed decodes now print the underlying library message —
+`avifResultToString`, the JXL decoder status, or `heif_error.message`).
 
 If you only ship assets you control, none of these is blocking. If you
 load user-supplied images (mods, uploads, etc.), see the security notes

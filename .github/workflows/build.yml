@@ -7,56 +7,121 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-linux:
+  build:
+    name: build-${{ matrix.platform }}-${{ matrix.config }}
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux, windows]
+        config: [release, debug]
     steps:
       - uses: actions/checkout@v4
         with: { submodules: recursive }
-      - run: |
+
+      - name: Install build tools
+        run: |
           sudo apt-get update
           sudo apt-get install -y build-essential cmake ninja-build meson nasm python3-pip pkg-config
-      - run: ./scripts/build-linux.sh release
-      - uses: actions/upload-artifact@v4
-        with: { name: bin-linux, path: bin/linux/, if-no-files-found: error }
 
-  build-windows:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4
-        with: { submodules: recursive }
-      - run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build meson nasm python3-pip pkg-config
-      - run: ./scripts/build-windows.sh release
-      - uses: actions/upload-artifact@v4
-        with: { name: bin-windows, path: bin/windows/, if-no-files-found: error }
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
+        run: ./scripts/build-linux.sh ${{ matrix.config }}
 
-  build-macos:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-        with: { submodules: recursive }
-      - run: brew install cmake ninja meson nasm
-      - run: ./scripts/build-macos.sh release x86_64 arm64
+      - name: Setup LLVM-MinGW (Windows cross-compile)
+        if: matrix.platform == 'windows'
+        run: |
+          set -euo pipefail
+          TOOLS="$HOME/tools"
+          mkdir -p "$TOOLS"
+          curl -sSL -o /tmp/llvm-mingw.tar.xz \
+            "https://github.com/mstorsjo/llvm-mingw/releases/download/20261117/llvm-mingw-20261117-ucrt-ubuntu-22.04-x86_64.tar.xz"
+          tar -xJf /tmp/llvm-mingw.tar.xz -C "$TOOLS"
+          mv "$TOOLS/llvm-mingw-20261117-ucrt-ubuntu-22.04-x86_64" "$TOOLS/llvm-mingw"
+          echo "LLVM_MINGW_ROOT=$TOOLS/llvm-mingw" >> "$GITHUB_ENV"
+          ls "$TOOLS/llvm-mingw/bin/x86_64-w64-mingw32-gcc"
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        run: ./scripts/build-windows.sh ${{ matrix.config }}
+
+      - name: Smoke test
+        run: |
+          set -euo pipefail
+          plat="${{ matrix.platform }}"
+          found=0
+          for f in bin/$plat/libgodot_extended_images.*; do
+            [ -f "$f" ] || continue
+            found=1
+            echo "--- $f ($(stat -c%s "$f") bytes)"
+            file "$f" | head -1
+            # The entry symbol must be exported
+            if [ "$plat" = "linux" ]; then
+              nm -D "$f" | grep -q extended_images_library_init
+            else
+              x86_64-w64-mingw32-nm -D "$f" 2>/dev/null | grep -q extended_images_library_init \
+                || nm -D "$f" 2>/dev/null | grep -q extended_images_library_init
+            fi
+          done
+          [ "$found" -eq 1 ] || { echo "ERROR: no extension binary produced"; exit 1; }
+
       - uses: actions/upload-artifact@v4
-        with: { name: bin-macos, path: bin/macos/, if-no-files-found: error }
+        with:
+          name: bin-${{ matrix.platform }}-${{ matrix.config }}
+          path: bin/${{ matrix.platform }}/
+          if-no-files-found: error
 
   package:
-    needs: [build-linux, build-windows, build-macos]
+    name: package + release
+    needs: [build]
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with: { path: artifacts/ }
-      - run: |
-          mkdir -p bin/linux bin/windows bin/macos
-          cp -r artifacts/bin-linux/* bin/linux/ 2>/dev/null || true
-          cp -r artifacts/bin-windows/* bin/windows/ 2>/dev/null || true
-          cp -r artifacts/bin-macos/* bin/macos/ 2>/dev/null || true
-          ./scripts/package-addon.sh
+
+      - name: Merge binaries into bin layout
+        run: |
+          mkdir -p bin/linux bin/windows
+          cp -r artifacts/bin-linux-release/*  bin/linux/  2>/dev/null || true
+          cp -r artifacts/bin-linux-debug/*    bin/linux/  2>/dev/null || true
+          cp -r artifacts/bin-windows-release/* bin/windows/ 2>/dev/null || true
+          cp -r artifacts/bin-windows-debug/*   bin/windows/ 2>/dev/null || true
+          ls -lhR bin/
+
+      - name: Package addon zip
+        run: ./scripts/package-addon.sh
+
+      - name: Collect loose binaries for release
+        run: |
+          mkdir -p release-bin
+          # The four extension binaries with their full platform-target-arch names
+          cp bin/linux/libgodot_extended_images.linux.*.so   release-bin/ 2>/dev/null || true
+          cp bin/windows/libgodot_extended_images.windows.*.dll release-bin/ 2>/dev/null || true
+          # Runtime DLLs the Windows build needs next to the extension
+          # (libc++/libunwind from LLVM-MinGW; NOT the extension itself)
+          for cfg in release debug; do
+            if [ -d "artifacts/bin-windows-$cfg" ]; then
+              for f in artifacts/bin-windows-$cfg/*.dll; do
+                case "$(basename "$f")" in
+                  libgodot_extended_images.*) ;;  # skip, already copied above
+                  *) cp "$f" release-bin/ ;;
+                esac
+              done
+            fi
+          done
+          ls -lh release-bin/
+
       - uses: actions/upload-artifact@v4
-        with: { name: godot_extended_images_addon, path: download/godot_extended_images_addon.zip }
-      - uses: softprops/action-gh-release@v2
+        with:
+          name: godot_extended_images_addon
+          path: download/godot_extended_images_addon.zip
+
+      - name: Attach binaries to tag release
+        uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: download/godot_extended_images_addon.zip
+          files: |
+            download/godot_extended_images_addon.zip
+            release-bin/*
