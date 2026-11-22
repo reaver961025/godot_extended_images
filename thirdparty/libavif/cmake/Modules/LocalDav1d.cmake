@@ -59,6 +59,44 @@ function(avif_build_local_dav1d)
             set(CROSS_FILE "${PROJECT_BINARY_DIR}/crossfile-apple.meson")
             configure_file("cmake/Meson/crossfile-apple.meson.in" "${CROSS_FILE}")
         endif()
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND CMAKE_CROSSCOMPILING)
+        # Cross-compiling for Windows (e.g. from Linux with LLVM-MinGW or
+        # MinGW-w64). Without a cross file meson would use the host compiler
+        # and produce ELF objects that the COFF linker cannot consume
+        # ("ld.lld: error: unknown file type"). Honor the cross file provided
+        # through the DAV1D_MESON_CROSS_FILE environment variable if present
+        # (see scripts/build-windows.sh); otherwise generate one from the
+        # active CMake toolchain.
+        if(DEFINED ENV{DAV1D_MESON_CROSS_FILE} AND EXISTS "$ENV{DAV1D_MESON_CROSS_FILE}")
+            set(CROSS_FILE "$ENV{DAV1D_MESON_CROSS_FILE}")
+        else()
+            if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|aarch64)$")
+                set(dav1d_host_cpu_family "aarch64")
+            elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+                set(dav1d_host_cpu_family "x86_64")
+            else()
+                set(dav1d_host_cpu_family "${CMAKE_SYSTEM_PROCESSOR}")
+            endif()
+            string(TOLOWER "${CMAKE_HOST_SYSTEM_NAME}" dav1d_build_system)
+            set(CROSS_FILE "${PROJECT_BINARY_DIR}/crossfile-windows.meson")
+            file(WRITE "${CROSS_FILE}"
+"[binaries]
+c = '${CMAKE_C_COMPILER}'
+cpp = '${CMAKE_CXX_COMPILER}'
+
+[host_machine]
+system = 'windows'
+cpu_family = '${dav1d_host_cpu_family}'
+cpu = '${dav1d_host_cpu_family}'
+endian = 'little'
+
+[build_machine]
+system = '${dav1d_build_system}'
+cpu_family = '${CMAKE_HOST_SYSTEM_PROCESSOR}'
+cpu = '${CMAKE_HOST_SYSTEM_PROCESSOR}'
+endian = 'little'
+")
+        endif()
     endif()
 
     if(CROSS_FILE)
