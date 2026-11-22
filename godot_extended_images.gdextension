@@ -1,0 +1,12 @@
+[configuration]
+entry_symbol = "extended_images_library_init"
+compatibility_minimum = 4.3
+
+[libraries]
+linux.editor.x86_64 = "res://addons/godot_extended_images/bin/linux/libgodot_extended_images.linux.template_debug.x86_64.so"
+linux.template_debug.x86_64 = "res://addons/godot_extended_images/bin/linux/libgodot_extended_images.linux.template_debug.x86_64.so"
+linux.template_release.x86_64 = "res://addons/godot_extended_images/bin/linux/libgodot_extended_images.linux.template_release.x86_64.so"
+
+windows.editor.x86_64 = "res://addons/godot_extended_images/bin/windows/libgodot_extended_images.windows.template_debug.x86_64.dll"
+windows.template_debug.x86_64 = "res://addons/godot_extended_images/bin/windows/libgodot_extended_images.windows.template_debug.x86_64.dll"
+windows.template_release.x86_64 = "res://addons/godot_extended_images/bin/windows/libgodot_extended_images.windows.template_release.x86_64.dll"

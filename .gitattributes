@@ -1,0 +1,12 @@
+# Normalizar EOL a LF en checkouts y commits para archivos de texto
+* text=auto eol=lf
+
+# Fuentes y binarios no deben tocarse
+*.png binary
+*.jpg binary
+*.svg text
+*.icns binary
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary

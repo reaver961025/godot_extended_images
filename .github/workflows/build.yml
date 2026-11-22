@@ -1,0 +1,62 @@
+name: Build
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build meson nasm python3-pip pkg-config
+      - run: ./scripts/build-linux.sh release
+      - uses: actions/upload-artifact@v4
+        with: { name: bin-linux, path: bin/linux/, if-no-files-found: error }
+
+  build-windows:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build meson nasm python3-pip pkg-config
+      - run: ./scripts/build-windows.sh release
+      - uses: actions/upload-artifact@v4
+        with: { name: bin-windows, path: bin/windows/, if-no-files-found: error }
+
+  build-macos:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with: { submodules: recursive }
+      - run: brew install cmake ninja meson nasm
+      - run: ./scripts/build-macos.sh release x86_64 arm64
+      - uses: actions/upload-artifact@v4
+        with: { name: bin-macos, path: bin/macos/, if-no-files-found: error }
+
+  package:
+    needs: [build-linux, build-windows, build-macos]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: artifacts/ }
+      - run: |
+          mkdir -p bin/linux bin/windows bin/macos
+          cp -r artifacts/bin-linux/* bin/linux/ 2>/dev/null || true
+          cp -r artifacts/bin-windows/* bin/windows/ 2>/dev/null || true
+          cp -r artifacts/bin-macos/* bin/macos/ 2>/dev/null || true
+          ./scripts/package-addon.sh
+      - uses: actions/upload-artifact@v4
+        with: { name: godot_extended_images_addon, path: download/godot_extended_images_addon.zip }
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: download/godot_extended_images_addon.zip
