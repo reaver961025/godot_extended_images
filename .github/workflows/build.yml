@@ -77,6 +77,10 @@ jobs:
     name: package + release
     needs: [build]
     runs-on: ubuntu-22.04
+    permissions:
+      # Required by softprops/action-gh-release to create the release
+      # and upload assets on tag pushes.
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
