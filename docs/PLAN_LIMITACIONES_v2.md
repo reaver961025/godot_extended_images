@@ -25,13 +25,17 @@
   `heif_error_get_string`, estado de `JxlDecoder`) con `ERR_PRINT`.
 - Harness de fuzzing que alimente archivos crafted a cada decodificador.
 
-## Plan v1.2.0 (fidelidad)
+## Plan v1.2.0 (fidelidad) — COMPLETADO
 
-- Ruta de 16 bits (y HDR float) para AVIF y JXL cuando el formato de Image
-  de Godot lo permita; fallback a 8 bits en caso contrario.
-- Aplicar orientación EXIF en AVIF, JXL y HEIC.
-- Preservar el perfil ICC en el Image de Godot.
-- Animaciones: exponer los fotogramas como array o `AnimatedTexture`.
+- ✔ Ruta de 16 bits (y HDR float) para AVIF y JXL: `RGBH`/`RGBAH` para
+  fuentes float (half float), `RGB16`/`RGBA16` para enteros de 10/12/16
+  bits, conmutada por `extended_images/hdr_output`.
+- ✔ Aplicar orientación EXIF en AVIF (irot/imir), JXL (orientation 1-8) y
+  HEIC (propiedades irot/imir del item).
+- ✔ Animaciones: clase `ExtendedImageInfo` con todos los fotogramas,
+  duraciones por fotograma (segundos), número de bucles y flags HDR/alpha.
+- ✘ Preservar el perfil ICC: queda pendiente (los píxeles salen en el
+  espacio de color de la fuente). Moverlo a v1.3.0.
 
 ## Plan v1.3.0 (empaquetado)
 
@@ -39,6 +43,7 @@
   se usan, compilar libsharpyuv estáticamente).
 - Build Linux universal que funcione entre distros.
 - Enviar a la Godot Asset Library.
+- Conversión de perfil ICC al espacio de color de la escena.
 
 ## Trazabilidad
 

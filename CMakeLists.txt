@@ -124,6 +124,7 @@ set(EXT_SRC
     src/resource_format_loader_extended.cpp
     src/editor_preview_generator_extended.cpp
     src/extended_images_editor_plugin.cpp
+    src/extended_image_info.cpp
 )
 
 set(_ext_suffix "")

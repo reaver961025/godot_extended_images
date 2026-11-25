@@ -18,9 +18,11 @@ FileSystem dock shows thumbnails, just like PNG.
 
 ## Status
 
-v1.1.0 — decode limits (268 MP pixel cap, 256 MiB file cap, both
-configurable via Project Settings) and real library error messages. The
-extension compiles and links cleanly on Linux x86_64 for both
+v1.2.0 — fidelity: 16-bit/HDR output for AVIF and JXL (half-float
+`RGBH`/`RGBAH` or `RGB16`/`RGBA16`, gated by `extended_images/hdr_output`),
+EXIF orientation applied for AVIF/JXL/HEIC, and animations exposed through
+the new `ExtendedImageInfo` class (all frames, per-frame durations, loop
+count). The extension compiles and links cleanly on Linux x86_64 for both
 template_debug and template_release (verified by full CMake + Ninja
 builds). Windows builds are produced by CI. See
 [CHANGELOG.md](CHANGELOG.md) for the full release notes and
@@ -92,35 +94,65 @@ LGPL.
 
 ## Decode limits (v1.1.0)
 
-Two Project Settings guard against crafted or oversized files. Both are
-read once and cached; set them to `0` to disable.
+Three Project Settings guard against crafted or oversized files. The caps
+are read once and cached; set them to `0` to disable.
 
 | Setting | Default | Meaning |
 |---|---|---|
 | `extended_images/max_pixels` | `268435456` (268 MP) | Maximum `width * height` accepted, checked **before** the decoder allocates its output buffer |
 | `extended_images/max_file_size` | `268435456` (256 MiB) | Maximum input file size handed to a decoder |
+| `extended_images/hdr_output` | `true` | Keep AVIF/JXL sources > 8 bits as 16-bit Godot Images (`RGBH`/`RGBAH` for float, `RGB16`/`RGBA16` for integer); `false` restores the v1.1 always-8-bit behavior |
 
 When a file exceeds a limit, the load fails and the console shows a message
 naming the actual dimensions/size, the active limit and the setting to
 raise. Files larger than 50 MP are unusual for game assets; if you load
 them intentionally, raise `max_pixels` accordingly.
 
+## Animations and HDR (v1.2.0)
+
+`load("res://x.avif")` and the editor import pipeline still return the
+first frame as an `ImageTexture`. To work with the full content, use the
+new `ExtendedImageInfo` class:
+
+```gdscript
+var info := ExtendedImageInfo.new()
+if info.load_file("res://spell.avif"):
+    print("frames: ", info.get_frame_count())
+    print("animated: ", info.is_animated())          # true for sequences
+    print("bit depth: ", info.get_bit_depth())       # e.g. 10
+    print("hdr: ", info.is_hdr())                   # float16 source
+    for i in info.get_frame_count():
+        var frame : Image = info.get_frame(i)       # orientation applied
+        var dur := info.get_frame_duration(i)       # seconds
+        # build your AnimatedTexture / SpriteFrames from here
+```
+
+`get_loop_count()` returns 0 for infinite loops; `get_total_duration()`
+is the length in seconds of one full playback. AVIF timing comes from
+the container's timescale; JXL timing from the animation header's ticks
+per second.
+
+Orientation (EXIF 1-8) stored in AVIF `irot`/`imir`, the JXL
+`orientation` field or the HEIC `irot`/`imir` properties is applied
+automatically to every frame — portrait photos from a phone now come out
+upright.
+
 ## Known limitations
 
-These are documented in detail in
-[docs/PLAN_LIMITACIONES_v2.md](docs/PLAN_LIMITACIONES_v2.md) and are
-slated for the next release:
+Remaining items are documented in
+[docs/PLAN_LIMITACIONES_v2.md](docs/PLAN_LIMITACIONES_v2.md) and slated
+for the next release:
 
-- **8-bit only.** AVIF, JPEG XL and HEIC can carry 10/12/16-bit and HDR
-  content; this extension always decodes to 8-bit RGB/RGBA. HDR is
-  tone-mapped down.
-- **No EXIF / ICC handling.** Orientation tags and color profiles are
-  ignored, so portrait photos from a phone may appear sideways.
-- **First frame only** for animated AVIF and animated JXL.
+- **No ICC color profile conversion.** Orientation is applied but color
+  profiles are not; pixels come out in the source's color space.
+- **HEIC stays 8-bit.** The libheif pipeline outputs 8-bit interleaved
+  RGB; 10/12-bit HEIC sources are quantized. AVIF/JXL do keep 16-bit.
+- **No encoder.** The extension is decode-only.
 
-Solved in v1.1.0: memory caps before decoding (see above) and error
-reporting (failed decodes now print the underlying library message —
-`avifResultToString`, the JXL decoder status, or `heif_error.message`).
+Solved in v1.2.0: 16-bit/HDR output for AVIF and JXL, EXIF orientation
+for all three container formats, animations exposed through
+`ExtendedImageInfo`. Solved in v1.1.0: memory caps before decoding and
+real library error messages.
 
 If you only ship assets you control, none of these is blocking. If you
 load user-supplied images (mods, uploads, etc.), see the security notes

@@ -6,6 +6,7 @@
 #include "resource_format_loader_extended.h"
 #include "editor_preview_generator_extended.h"
 #include "extended_images_editor_plugin.h"
+#include "extended_image_info.h"
 #include <godot_cpp/classes/editor_plugin_registration.hpp>
 #include <godot_cpp/classes/ref.hpp>
 #include <godot_cpp/classes/resource_loader.hpp>
@@ -25,6 +26,7 @@ void register_types(ModuleInitializationLevel p_level) {
         ClassDB::register_class<ImageFormatLoaderHEIC>();
         ClassDB::register_class<ImageFormatLoaderQOI>();
         ClassDB::register_class<ResourceFormatLoaderExtended>();
+        ClassDB::register_class<ExtendedImageInfo>();
         g_avif.instantiate(); if (g_avif.is_valid()) g_avif->add_format_loader();
         g_jxl.instantiate(); if (g_jxl.is_valid()) g_jxl->add_format_loader();
         g_heic.instantiate(); if (g_heic.is_valid()) g_heic->add_format_loader();

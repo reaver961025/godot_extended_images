@@ -3,6 +3,35 @@
 All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.0] - 2026-11-25
+
+### Added
+- **16-bit / HDR output.** AVIF and JXL sources with more than 8 bits per
+  channel now decode to Godot's 16-bit `Image` formats instead of being
+  quantized to 8 bits: float sources become `FORMAT_RGBH`/`FORMAT_RGBAH`
+  (IEEE 754 half float, true HDR), integer 10/12/16-bit sources become
+  `FORMAT_RGB16`/`FORMAT_RGBA16`. Controlled by the new
+  `extended_images/hdr_output` ProjectSetting (default `true`; set `false`
+  for the previous always-8-bit behavior). HEIC/QOI stay 8-bit (their
+  pipelines output 8-bit interleaved RGB anyway).
+- **Orientation applied.** Portrait photos no longer come out sideways:
+  AVIF `irot`/`imir` boxes, the JXL `orientation` field (EXIF values 1-8)
+  and the HEIC `irot`/`imir` item properties are applied to the decoded
+  image before it is returned. Still images AND every animation frame.
+- **Animations exposed: new `ExtendedImageInfo` class.** `load_file()` /
+  `load_bytes()` decode every frame of an AVIF sequence or JXL animation
+  (HEIC/QOI load their single still image), then expose
+  `is_animated()`, `get_frame_count()`, `get_frame(i)`,
+  `get_frame_duration(i)` (seconds, from the container timing),
+  `get_frame_durations()`, `get_loop_count()` (0 = infinite),
+  `get_total_duration()`, `get_bit_depth()`, `is_hdr()`,
+  `get_has_alpha()` and `get_error()`. Plain `load("res://x.avif")`
+  keeps returning the first frame as before.
+
+### Fixed
+- `ClockDirection` used by the new rotation code is a global godot enum
+  (`ClockDirection::CLOCKWISE`), not `Image::CLOCKWISE` as first written.
+
 ## [1.1.0] - 2026-11-22
 
 ### Added
