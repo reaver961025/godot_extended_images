@@ -55,13 +55,15 @@ jobs:
             found=1
             echo "--- $f ($(stat -c%s "$f") bytes)"
             file "$f" | head -1
-            # The entry symbol must be exported
-            if [ "$plat" = "linux" ]; then
-              nm -D "$f" | grep -q extended_images_library_init
-            else
-              x86_64-w64-mingw32-nm -D "$f" 2>/dev/null | grep -q extended_images_library_init \
-                || nm -D "$f" 2>/dev/null | grep -q extended_images_library_init
-            fi
+            # The entry symbol must be exported. strings-based check works for
+            # both ELF (.dynstr) and PE (export directory stores ASCII names);
+            # dumped to a temp file first so an early grep exit cannot
+            # SIGPIPE strings under `set -o pipefail`.
+            strtmp="$(mktemp)"
+            strings "$f" > "$strtmp"
+            grep -q extended_images_library_init "$strtmp" \
+              || { echo "ERROR: entry symbol not exported in $f"; rm -f "$strtmp"; exit 1; }
+            rm -f "$strtmp"
           done
           [ "$found" -eq 1 ] || { echo "ERROR: no extension binary produced"; exit 1; }
 
