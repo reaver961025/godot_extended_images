@@ -3,6 +3,18 @@
 All notable changes to this project are documented in this file. The format
 is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.2.1] - 2026-11-26
+
+### Fixed
+- **The extension did not load in a real Godot editor** (found while testing
+  inside the official 2D Platformer demo with Godot 4.7.2): the shared
+  library failed with `undefined symbol: BrotliDefaultAllocFunc`. GNU ld
+  processes archives left-to-right, and `libbrotlicommon` was listed before
+  `libbrotlidec`/`libbrotlienc` in the link line, so the linker discarded it
+  before dec/enc pulled in its symbols. The symbol-smoke-tests never caught
+  this because it only manifests at `dlopen` time. Reordered the link line;
+  verified loading and importing in Godot 4.7.2 stable.
+
 ## [1.2.0] - 2026-11-25
 
 ### Added

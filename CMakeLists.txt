@@ -184,11 +184,14 @@ target_link_libraries(godot_extended_images PRIVATE
     ${_jxl_build_lib_dir}/libjxl${_lib_suf}
     ${_jxl_build_lib_dir}/libjxl_cms${_lib_suf}
     ${_jxl_build_lib_dir}/libjxl_dec-internal${_lib_suf}
-    ${_jxl_brotli_lib_dir}/libbrotlicommon${_lib_suf}
     ${_jxl_brotli_lib_dir}/libbrotlidec${_lib_suf}
     ${_jxl_brotli_lib_dir}/libbrotlienc${_lib_suf}
+    ${_jxl_brotli_lib_dir}/libbrotlicommon${_lib_suf}
     ${_jxl_highway_lib_dir}/libhwy${_lib_suf}
 )
+# NOTE: brotlicommon must come AFTER brotlidec/brotlienc: GNU ld processes
+# archives left-to-right and would otherwise discard it before dec/enc pull
+# in BrotliDefaultAllocFunc & friends (broke loading in a real Godot editor).
 
 if(GODOTCPP_PLATFORM STREQUAL "linux")
     target_link_libraries(godot_extended_images PRIVATE pthread)
